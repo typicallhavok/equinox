@@ -26,7 +26,8 @@ jobs:
 
       - name: Install Rust nightly + rust-src
         run: |
-          rustup toolchain install nightly --component rust-src rustfmt clippy
+          rustup toolchain install nightly \
+            --component rust-src --component rustfmt --component clippy
           rustup default nightly
 
       - name: Cache cargo
