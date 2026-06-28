@@ -5,10 +5,11 @@
 //! instance is evicted within one reload cycle and re-added automatically once
 //! it recovers (or when discovery / config changes the set).
 
-use crate::discovery::Backend;
-use std::net::SocketAddr;
-use std::time::Duration;
+use std::{net::SocketAddr, time::Duration};
+
 use tokio::task::JoinSet;
+
+use crate::discovery::Backend;
 
 /// Return only the backends that accept a TCP connection on their probe port.
 ///

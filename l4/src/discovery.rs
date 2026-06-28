@@ -6,12 +6,15 @@
 //! deliver the frame, backends must be reachable on the same L2 segment as the
 //! shield's interface.
 
-use crate::config::{Config, Strategy};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, Ipv4Addr},
+};
+
 use anyhow::{Context as _, Result, anyhow, bail};
-use bollard::Docker;
-use bollard::container::ListContainersOptions;
-use std::collections::HashMap;
-use std::net::{IpAddr, Ipv4Addr};
+use bollard::{Docker, container::ListContainersOptions};
+
+use crate::config::{Config, Strategy};
 
 /// A resolved backend the data plane can route to.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -98,10 +101,11 @@ async fn discover_docker(cfg: &Config) -> Result<Vec<Backend>> {
                 .as_ref()
                 .and_then(|l| l.get("com.docker.compose.service"))
                 .is_some_and(|v| v == svc);
-            let matches_name = c
-                .names
-                .as_ref()
-                .is_some_and(|names| names.iter().any(|n| n.trim_start_matches('/').contains(svc)));
+            let matches_name = c.names.as_ref().is_some_and(|names| {
+                names
+                    .iter()
+                    .any(|n| n.trim_start_matches('/').contains(svc))
+            });
             if !matches_label && !matches_name {
                 continue;
             }

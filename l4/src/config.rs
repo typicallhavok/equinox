@@ -5,9 +5,10 @@
 //! backends live (static list, Docker, or DNS), plus optional `protection`,
 //! `health_check`, and `observability` blocks.
 
+use std::{path::Path, time::Duration};
+
 use anyhow::{Context as _, Result};
 use serde::Deserialize;
-use std::{path::Path, time::Duration};
 
 fn default_true() -> bool {
     true
@@ -173,10 +174,7 @@ impl Config {
                     .and_then(|p| p.rate_limit_per_sec)
                     .unwrap_or(5000),
                 window_ms: other.as_ref().and_then(|p| p.window_ms).unwrap_or(1000),
-                malformed_max: other
-                    .as_ref()
-                    .and_then(|p| p.malformed_limit)
-                    .unwrap_or(20),
+                malformed_max: other.as_ref().and_then(|p| p.malformed_limit).unwrap_or(20),
                 block_secs: other
                     .as_ref()
                     .and_then(|p| p.block_duration_secs)
@@ -187,7 +185,10 @@ impl Config {
 
     /// Whether active backend health checking is enabled (default true).
     pub fn health_check_enabled(&self) -> bool {
-        self.health_check.as_ref().map(|h| h.enabled).unwrap_or(true)
+        self.health_check
+            .as_ref()
+            .map(|h| h.enabled)
+            .unwrap_or(true)
     }
 
     /// Health-check connect timeout, defaulting to 500ms.

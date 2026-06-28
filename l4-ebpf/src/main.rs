@@ -5,6 +5,8 @@
 // pattern, so silence it crate-wide.
 #![allow(static_mut_refs)]
 
+use core::mem;
+
 use aya_ebpf::{
     bindings::xdp_action,
     helpers::bpf_ktime_get_ns,
@@ -12,7 +14,6 @@ use aya_ebpf::{
     maps::{Array, HashMap, LruHashMap, PerCpuArray},
     programs::XdpContext,
 };
-use core::mem;
 use l4_common::{
     BUFFERS, CTRL_ACTIVE, CTRL_BLOCK_SECS, CTRL_DROP_UNMATCHED, CTRL_LEN, CTRL_MALFORMED_MAX,
     CTRL_RATE_MAX, CTRL_RATE_WINDOW_MS, M, N, Node, RateState, STAT_DROPPED_BLOCKED,
@@ -261,7 +262,11 @@ fn try_l4(ctx: XdpContext) -> Result<u32, u32> {
         // ---- DNAT rewrite + checksum fix-ups ----
         let backend_ip = node.daddr; // host order
         let old_ip = dest_addr.to_bits(); // host order
-        let new_port = if node.dport != 0 { node.dport } else { dest_port };
+        let new_port = if node.dport != 0 {
+            node.dport
+        } else {
+            dest_port
+        };
 
         // The high/low 16-bit words of a host-order IPv4 value equal the
         // big-endian on-wire words, so the checksum math works directly.

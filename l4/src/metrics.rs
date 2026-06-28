@@ -6,11 +6,16 @@
 //!   - `GET /metrics`  Prometheus text exposition of data-plane counters.
 //!   - `GET /healthz`  200 when the shield has at least one healthy backend, else 503.
 
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, AtomicU64, Ordering},
+};
+
 use anyhow::{Context as _, Result};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpListener;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpListener,
+};
 
 /// Snapshot of counters shared between the reload loop (writer) and the HTTP
 /// server (reader). Updated each reload from the eBPF stats map.
@@ -90,7 +95,11 @@ pub async fn serve(addr: String, state: Arc<MetricsState>) -> Result<()> {
                     if state.ready.load(Ordering::Relaxed) {
                         ("200 OK", "text/plain", "ok\n".to_string())
                     } else {
-                        ("503 Service Unavailable", "text/plain", "no healthy backends\n".to_string())
+                        (
+                            "503 Service Unavailable",
+                            "text/plain",
+                            "no healthy backends\n".to_string(),
+                        )
                     }
                 }
                 _ => ("404 Not Found", "text/plain", "not found\n".to_string()),

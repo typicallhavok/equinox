@@ -5,16 +5,18 @@
 //! atomically. The XDP program is never detached, so traffic keeps flowing
 //! across reloads.
 
-use crate::config::ProtectionSettings;
-use crate::discovery::Backend;
 use anyhow::{Context as _, Result};
-use aya::Ebpf;
-use aya::maps::{Array, HashMap, MapData, PerCpuArray};
+use aya::{
+    Ebpf,
+    maps::{Array, HashMap, MapData, PerCpuArray},
+};
 use l4_common::{
     CTRL_ACTIVE, CTRL_BLOCK_SECS, CTRL_DROP_UNMATCHED, CTRL_MALFORMED_MAX, CTRL_RATE_MAX,
     CTRL_RATE_WINDOW_MS, M, N, Node, STAT_DROPPED_BLOCKED, STAT_DROPPED_NOBACKEND,
     STAT_DROPPED_RATE, STAT_DROPPED_VALIDATION, STAT_ROUTED,
 };
+
+use crate::{config::ProtectionSettings, discovery::Backend};
 
 /// Data-plane counters scraped from the eBPF per-CPU stats map.
 #[derive(Debug, Default, Clone, Copy)]
@@ -99,7 +101,9 @@ impl DataPlane {
     pub fn set_ports(&mut self, ports: &[u16]) -> Result<()> {
         for &p in ports {
             if !self.installed_ports.contains(&p) {
-                self.ports.insert(p, 1u8, 0).context("inserting listen port")?;
+                self.ports
+                    .insert(p, 1u8, 0)
+                    .context("inserting listen port")?;
             }
         }
         for &p in &self.installed_ports {

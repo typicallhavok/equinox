@@ -5,6 +5,12 @@ mod health;
 mod maglev;
 mod metrics;
 
+use std::{
+    path::{Path, PathBuf},
+    sync::{Arc, atomic::Ordering},
+    time::Duration,
+};
+
 use anyhow::{Context as _, Result};
 use aya::programs::{Xdp, XdpFlags};
 use clap::Parser;
@@ -12,12 +18,7 @@ use config::Config;
 use dataplane::DataPlane;
 use log::{error, info, warn};
 use metrics::MetricsState;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::sync::atomic::Ordering;
-use std::time::Duration;
-use tokio::signal;
-use tokio::sync::mpsc;
+use tokio::{signal, sync::mpsc};
 
 #[derive(Debug, Parser)]
 struct Opt {
@@ -99,10 +100,7 @@ async fn main() -> Result<()> {
     }
 
     // Load + attach the eBPF data plane.
-    let mut ebpf = aya::Ebpf::load(aya::include_bytes_aligned!(concat!(
-        env!("OUT_DIR"),
-        "/l4"
-    )))?;
+    let mut ebpf = aya::Ebpf::load(aya::include_bytes_aligned!(concat!(env!("OUT_DIR"), "/l4")))?;
 
     let xdp_mode = Config::load(&opt.config)
         .map(|c| c.xdp_mode().to_string())
@@ -117,7 +115,10 @@ async fn main() -> Result<()> {
     let metrics = MetricsState::new();
 
     // Optional observability endpoint (only when configured).
-    if let Some(addr) = Config::load(&opt.config).ok().and_then(|c| c.metrics_addr()) {
+    if let Some(addr) = Config::load(&opt.config)
+        .ok()
+        .and_then(|c| c.metrics_addr())
+    {
         let m = metrics.clone();
         tokio::spawn(async move {
             if let Err(e) = metrics::serve(addr, m).await {
@@ -233,11 +234,15 @@ async fn reload(path: &Path, dp: &mut DataPlane, metrics: &Arc<MetricsState>) ->
     metrics
         .dropped_blocked
         .store(s.dropped_blocked, Ordering::Relaxed);
-    metrics.dropped_rate.store(s.dropped_rate, Ordering::Relaxed);
+    metrics
+        .dropped_rate
+        .store(s.dropped_rate, Ordering::Relaxed);
     metrics
         .dropped_nobackend
         .store(s.dropped_nobackend, Ordering::Relaxed);
-    metrics.backends_total.store(total as u64, Ordering::Relaxed);
+    metrics
+        .backends_total
+        .store(total as u64, Ordering::Relaxed);
     metrics
         .backends_healthy
         .store(healthy as u64, Ordering::Relaxed);
@@ -262,32 +267,33 @@ fn watch_config(path: &Path, tx: mpsc::Sender<()>) -> Option<notify::Recommended
         .unwrap_or_else(|| PathBuf::from("."));
     let file_name = path.file_name().map(|n| n.to_os_string());
 
-    let mut watcher = match notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
-        let Ok(event) = res else { return };
-        if !matches!(
-            event.kind,
-            EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
-        ) {
-            return;
-        }
-        // Only react to the config file itself.
-        let touched = match &file_name {
-            Some(name) => event
-                .paths
-                .iter()
-                .any(|p| p.file_name() == Some(name.as_os_str())),
-            None => true,
+    let mut watcher =
+        match notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+            let Ok(event) = res else { return };
+            if !matches!(
+                event.kind,
+                EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
+            ) {
+                return;
+            }
+            // Only react to the config file itself.
+            let touched = match &file_name {
+                Some(name) => event
+                    .paths
+                    .iter()
+                    .any(|p| p.file_name() == Some(name.as_os_str())),
+                None => true,
+            };
+            if touched {
+                let _ = tx.try_send(());
+            }
+        }) {
+            Ok(w) => w,
+            Err(e) => {
+                warn!("config file watch disabled: {e}");
+                return None;
+            }
         };
-        if touched {
-            let _ = tx.try_send(());
-        }
-    }) {
-        Ok(w) => w,
-        Err(e) => {
-            warn!("config file watch disabled: {e}");
-            return None;
-        }
-    };
 
     if let Err(e) = watcher.watch(&watch_target, RecursiveMode::NonRecursive) {
         warn!("could not watch {}: {e}", watch_target.display());
