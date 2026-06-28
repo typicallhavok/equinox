@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>equinox — eBPF ingress shield</title>
+        <meta
+            name="description"
+            content="An XDP/eBPF ingress shield: in-kernel packet validation, Maglev load balancing, and abuse protection. Run it like nginx, in Docker."
+        />
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <header class="nav">
+            <div class="container nav__inner">
+                <a class="brand" href="#top">
+                    <span class="brand__mark">≡</span>
+                    <span class="brand__name">equinox</span>
+                </a>
+                <nav class="nav__links">
+                    <a href="#features">Features</a>
+                    <a href="#performance">Performance</a>
+                    <a href="#run">Quickstart</a>
+                    <a href="#config">Config</a>
+                    <a href="https://github.com" class="nav__cta">GitHub</a>
+                </nav>
+            </div>
+        </header>
+
+        <main id="top">
+            <!-- Hero -->
+            <section class="hero">
+                <div class="container">
+                    <p class="eyebrow">XDP · eBPF · Rust</p>
+                    <h1 class="hero__title">
+                        The ingress shield that lives in the kernel.
+                    </h1>
+                    <p class="hero__lead">
+                        equinox validates and load-balances traffic inside the
+                        NIC driver with XDP — before a packet ever reaches your
+                        host stack. No userspace proxy in the hot path, no extra
+                        hop, no per-connection overhead.
+                    </p>
+                    <div class="hero__actions">
+                        <a class="btn btn--primary" href="#run">Quickstart</a>
+                        <a class="btn btn--ghost" href="#features"
+                            >See the features</a
+                        >
+                    </div>
+
+                    <div class="terminal" aria-hidden="true">
+                        <div class="terminal__bar">
+                            <span class="dot"></span><span class="dot"></span
+                            ><span class="dot"></span>
+                            <span class="terminal__title">shell</span>
+                        </div>
+                        <pre
+                            class="terminal__body"
+                        ><code><span class="c-prompt">$</span> docker run --rm --network host --privileged \
+    ghcr.io/you/equinox:latest
+
+<span class="c-ok">[info]</span> auto-detected interface: eth0
+<span class="c-ok">[info]</span> XDP shield attached to eth0 in <span class="c-hl">native</span> mode
+<span class="c-ok">[info]</span> ingress shield up; hot reload active
+<span class="c-ok">[info]</span> reloaded: <span class="c-hl">3/3</span> backend(s) healthy</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Stats -->
+            <section class="stats">
+                <div class="container stats__grid">
+                    <div class="stat">
+                        <div class="stat__num">XDP</div>
+                        <div class="stat__label">
+                            Runs in the driver, before SKB allocation
+                        </div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat__num">0&nbsp;ms</div>
+                        <div class="stat__label">
+                            Downtime on reload — atomic buffer switch
+                        </div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat__num">650</div>
+                        <div class="stat__label">
+                            Backends per buffer via Maglev hashing
+                        </div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat__num">L4</div>
+                        <div class="stat__label">
+                            In-kernel validation &amp; DNAT
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Features -->
+            <section id="features" class="section">
+                <div class="container">
+                    <h2 class="section__title">Core features</h2>
+                    <p class="section__sub">
+                        Everything you need to put a kernel-speed shield in
+                        front of your services.
+                    </p>
+
+                    <div class="cards">
+                        <article class="card">
+                            <h3 class="card__title">In-kernel validation</h3>
+                            <p>
+                                Truncated packets and illegal TCP flag
+                                combinations (NULL, SYN+FIN, SYN+RST, FIN+RST,
+                                XMAS) are dropped at the NIC. Unrelated traffic
+                                — SSH, everything off your listen ports — passes
+                                straight through, untouched.
+                            </p>
+                        </article>
+
+                        <article class="card">
+                            <h3 class="card__title">Maglev load balancing</h3>
+                            <p>
+                                Consistent hashing with a 65,537-entry table
+                                keeps flows pinned to backends even as the set
+                                changes. Packets are DNAT'd and re-transmitted
+                                with <code>XDP_TX</code> — no userspace round
+                                trip.
+                            </p>
+                        </article>
+
+                        <article class="card">
+                            <h3 class="card__title">
+                                Zero-downtime hot reload
+                            </h3>
+                            <p>
+                                Routing tables are double-buffered. The control
+                                plane fills a standby buffer and flips a single
+                                atomic value to switch over. The XDP program is
+                                never detached; traffic never stops.
+                            </p>
+                        </article>
+
+                        <article class="card">
+                            <h3 class="card__title">Abuse protection</h3>
+                            <p>
+                                Per-source-IP sliding windows count requests and
+                                malformed packets. Cross the limit and the
+                                source is blacklisted in-kernel for five minutes
+                                — all of it happening in the data plane, not
+                                after the fact.
+                            </p>
+                        </article>
+
+                        <article class="card">
+                            <h3 class="card__title">Active health checking</h3>
+                            <p>
+                                Backends are TCP-probed every reload. A crashed
+                                instance is evicted from the table within a
+                                cycle and re-added automatically when it
+                                recovers. No traffic black-holed.
+                            </p>
+                        </article>
+
+                        <article class="card">
+                            <h3 class="card__title">Flexible discovery</h3>
+                            <p>
+                                Find backends statically, through the Docker
+                                socket, or via DNS. Ports are optional and
+                                override per route. Edit the config and it
+                                reloads live.
+                            </p>
+                        </article>
+
+                        <article class="card">
+                            <h3 class="card__title">Opt-in observability</h3>
+                            <p>
+                                Set one address and get Prometheus
+                                <code>/metrics</code> — routed and
+                                dropped-by-reason counters, backend gauges —
+                                plus a <code>/healthz</code> readiness probe.
+                                Off by default, zero setup to skip it.
+                            </p>
+                        </article>
+
+                        <article class="card">
+                            <h3 class="card__title">
+                                Native XDP, with fallback
+                            </h3>
+                            <p>
+                                Attaches in native driver mode where the NIC
+                                supports it (Intel, Mellanox, virtio-net) and
+                                falls back to SKB mode everywhere else. One
+                                config line to force a mode.
+                            </p>
+                        </article>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Performance -->
+            <section id="performance" class="section section--alt">
+                <div class="container perf">
+                    <div class="perf__copy">
+                        <h2 class="section__title">Why it's fast</h2>
+                        <p class="section__sub">
+                            A traditional load balancer copies every packet into
+                            userspace, makes a decision, and copies it back.
+                            equinox decides inside the NIC driver.
+                        </p>
+                        <ul class="perf__list">
+                            <li>
+                                <strong>Before the stack.</strong> The XDP hook
+                                runs before <code>skb</code> allocation — the
+                                kernel hasn't paid for the packet yet.
+                            </li>
+                            <li>
+                                <strong>No proxy in the path.</strong> Routing
+                                is a hash lookup and a checksum fixup, then
+                                <code>XDP_TX</code> straight back out the wire.
+                            </li>
+                            <li>
+                                <strong>No connection state.</strong> Maglev
+                                means consistent routing without tracking every
+                                flow, so memory and CPU stay flat under load.
+                            </li>
+                            <li>
+                                <strong>RFC 1624 incremental checksums.</strong>
+                                Only the changed bytes are recomputed, never the
+                                whole packet.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="perf__diagram" aria-hidden="true">
+                        <div class="flow">
+                            <div class="flow__row flow__row--bad">
+                                <span class="flow__tag">Userspace LB</span>
+                                <span class="pill">NIC</span>
+                                <span class="arrow">→</span>
+                                <span class="pill pill--muted">kernel</span>
+                                <span class="arrow">→</span>
+                                <span class="pill pill--muted">userspace</span>
+                                <span class="arrow">→</span>
+                                <span class="pill pill--muted">kernel</span>
+                                <span class="arrow">→</span>
+                                <span class="pill">backend</span>
+                            </div>
+                            <div class="flow__row flow__row--good">
+                                <span class="flow__tag">equinox</span>
+                                <span class="pill">NIC</span>
+                                <span class="arrow">→</span>
+                                <span class="pill pill--accent">XDP</span>
+                                <span class="arrow">→</span>
+                                <span class="pill">backend</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quickstart -->
+            <section id="run" class="section">
+                <div class="container">
+                    <h2 class="section__title">Quickstart</h2>
+                    <p class="section__sub">
+                        Run it in Docker (recommended) or directly on the host —
+                        pick a path and drop a <code>config.yaml</code> next to
+                        it. Edit the file live to hot-reload.
+                    </p>
+
+                    <div class="tabs" data-tabs>
+                        <div
+                            class="tabs__list"
+                            role="tablist"
+                            aria-label="Install method"
+                        >
+                            <button
+                                class="tabs__btn is-active"
+                                role="tab"
+                                aria-selected="true"
+                                data-tab="docker"
+                            >
+                                Docker
+                            </button>
+                            <button
+                                class="tabs__btn"
+                                role="tab"
+                                aria-selected="false"
+                                data-tab="bare"
+                            >
+                                Bare&nbsp;metal
+                            </button>
+                        </div>
+
+                        <!-- Docker -->
+                        <div
+                            class="tabs__panel is-active"
+                            role="tabpanel"
+                            data-panel="docker"
+                        >
+                            <div class="code">
+                                <div class="code__bar">
+                                    <span>terminal</span>
+                                </div>
+                                <pre><code><span class="c-comment"># 1. Pull the image</span>
+<span class="c-prompt">$</span> docker pull ghcr.io/you/equinox:latest
+
+<span class="c-comment"># 2. Run it — zero config, starts on the baked-in default</span>
+<span class="c-prompt">$</span> docker run --rm --network host --privileged \
+    ghcr.io/you/equinox:latest
+
+<span class="c-comment"># To customise: mount the current dir. A config.yaml template is</span>
+<span class="c-comment"># seeded for you on first run — edit it and it hot-reloads.</span>
+<span class="c-prompt">$</span> docker run --rm --network host --privileged \
+    -v "$(pwd):/app" ghcr.io/you/equinox:latest
+
+<span class="c-comment"># …or bring up the shield + demo backends together</span>
+<span class="c-prompt">$</span> docker compose up --build</code></pre>
+                            </div>
+                            <p class="run__note">
+                                No volume flag needed to start — the image ships
+                                a default config. The interface is auto-detected
+                                from the default route (override with
+                                <code>-e IFACE=eth0</code>), and
+                                <code>--cap-add NET_ADMIN SYS_ADMIN BPF</code>
+                                works in place of <code>--privileged</code> on
+                                most kernels.
+                            </p>
+                        </div>
+
+                        <!-- Bare metal -->
+                        <div
+                            class="tabs__panel"
+                            role="tabpanel"
+                            data-panel="bare"
+                            hidden
+                        >
+                            <div class="code">
+                                <div class="code__bar">
+                                    <span>terminal</span>
+                                </div>
+                                <pre><code><span class="c-comment"># 1. Toolchain (one-time)</span>
+<span class="c-prompt">$</span> rustup toolchain install stable
+<span class="c-prompt">$</span> rustup toolchain install nightly --component rust-src
+<span class="c-prompt">$</span> cargo install bpf-linker
+
+<span class="c-comment"># 2. Build the control plane (eBPF is built automatically)</span>
+<span class="c-prompt">$</span> cargo build --release --package l4
+
+<span class="c-comment"># 3. Run as root — needs CAP_NET_ADMIN + CAP_SYS_ADMIN</span>
+<span class="c-prompt">$</span> sudo RUST_LOG=info ./target/release/l4 --config config.yaml</code></pre>
+                            </div>
+                            <p class="run__note">
+                                <code>--iface</code> is auto-detected from the
+                                default route; override with
+                                <code>--iface eth0</code>. Linux only — eBPF/XDP
+                                is a kernel feature.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Configuration -->
+            <section id="config" class="section section--alt">
+                <div class="container">
+                    <h2 class="section__title">Configuration</h2>
+                    <p class="section__sub">
+                        A single YAML file, read on start and re-read on every
+                        edit. Here is a complete example with every block; only
+                        <code>gateway</code> and <code>discovery</code> are
+                        required.
+                    </p>
+
+                    <div class="run">
+                        <div class="run__col">
+                            <div class="code">
+                                <div class="code__bar">
+                                    <span>config.yaml</span>
+                                </div>
+                                <pre><code><span class="y-key">gateway</span>:
+  <span class="y-key">listen_ports</span>: [<span class="y-num">80</span>, <span class="y-num">443</span>]   <span class="c-comment"># ports to shield; all else passes through</span>
+  <span class="y-key">xdp_mode</span>: <span class="y-str">"auto"</span>          <span class="c-comment"># auto | skb | drv | hw</span>
+
+<span class="y-key">discovery</span>:
+  <span class="y-key">strategy</span>: <span class="y-str">"docker"</span>       <span class="c-comment"># static | docker | dns</span>
+  <span class="y-key">sync_interval_ms</span>: <span class="y-num">3000</span>   <span class="c-comment"># re-discover this often</span>
+  <span class="y-key">drop_unmatched</span>: <span class="y-bool">false</span>    <span class="c-comment"># drop vs. pass when no backend</span>
+  <span class="y-key">network</span>: <span class="y-str">"equinox_backends"</span>
+  <span class="c-comment"># static_routes: [{ ip: "172.18.0.10", port: 3000 }]</span>
+
+<span class="y-key">protection</span>:               <span class="c-comment"># per-source-IP abuse limits</span>
+  <span class="y-key">enabled</span>: <span class="y-bool">true</span>
+  <span class="y-key">rate_limit_per_sec</span>: <span class="y-num">5000</span>
+  <span class="y-key">malformed_limit</span>: <span class="y-num">20</span>
+  <span class="y-key">window_ms</span>: <span class="y-num">1000</span>
+  <span class="y-key">block_duration_secs</span>: <span class="y-num">300</span>  <span class="c-comment"># blacklist for 5 min</span>
+
+<span class="y-key">health_check</span>:             <span class="c-comment"># evict dead backends</span>
+  <span class="y-key">enabled</span>: <span class="y-bool">true</span>
+  <span class="y-key">timeout_ms</span>: <span class="y-num">500</span>
+
+<span class="c-comment"># observability:             # opt-in; omit to keep off</span>
+<span class="c-comment">#   metrics_addr: "0.0.0.0:9100"</span></code></pre>
+                            </div>
+                        </div>
+
+                        <div class="run__col">
+                            <table class="settings">
+                                <thead>
+                                    <tr>
+                                        <th>Setting</th>
+                                        <th>Default</th>
+                                        <th>What it does</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>listen_ports</code></td>
+                                        <td>80, 443</td>
+                                        <td>
+                                            Ports intercepted &amp; validated;
+                                            everything else passes straight to
+                                            the host.
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>xdp_mode</code></td>
+                                        <td>auto</td>
+                                        <td>
+                                            Attach mode. <code>auto</code> tries
+                                            native and falls back to SKB.
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>strategy</code></td>
+                                        <td>—</td>
+                                        <td>
+                                            Where backends come from:
+                                            <code>static</code>,
+                                            <code>docker</code> socket, or
+                                            <code>dns</code>.
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>sync_interval_ms</code></td>
+                                        <td>3000</td>
+                                        <td>
+                                            How often discovery re-runs to pick
+                                            up scaled or crashed instances.
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>drop_unmatched</code></td>
+                                        <td>false</td>
+                                        <td>
+                                            Drop validated packets with no
+                                            backend instead of passing them.
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>protection.enabled</code></td>
+                                        <td>true</td>
+                                        <td>
+                                            In-kernel per-source rate &amp;
+                                            malformed limiting with timed
+                                            blacklist.
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <code>block_duration_secs</code>
+                                        </td>
+                                        <td>300</td>
+                                        <td>
+                                            How long a tripped source stays
+                                            blacklisted.
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <code>health_check.enabled</code>
+                                        </td>
+                                        <td>true</td>
+                                        <td>
+                                            TCP-probe backends each reload; only
+                                            healthy ones get traffic.
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>metrics_addr</code></td>
+                                        <td>off</td>
+                                        <td>
+                                            Set it to expose Prometheus
+                                            <code>/metrics</code> +
+                                            <code>/healthz</code>.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CTA -->
+            <section class="cta">
+                <div class="container cta__inner">
+                    <h2 class="cta__title">
+                        Put the shield in front of your services.
+                    </h2>
+                    <p class="cta__sub">
+                        Linux + Docker. Apache-2.0 control plane, GPL-2.0 data
+                        plane.
+                    </p>
+                    <div class="hero__actions">
+                        <a class="btn btn--primary" href="https://github.com"
+                            >Get started on GitHub</a
+                        >
+                        <a class="btn btn--ghost" href="#features"
+                            >Back to features</a
+                        >
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <div class="container footer__inner">
+                <span class="brand"
+                    ><span class="brand__mark">≡</span> equinox</span
+                >
+                <span class="footer__meta"
+                    >XDP ingress shield · built with Rust &amp; eBPF</span
+                >
+            </div>
+        </footer>
+
+        <script src="script.js"></script>
+    </body>
+</html>

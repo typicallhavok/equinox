@@ -1,0 +1,56 @@
+[package]
+name = "l4"
+version = "0.1.0"
+edition.workspace = true
+
+license.workspace = true
+
+[dependencies]
+l4-common = { path = "../l4-common", features = ["user"] }
+
+anyhow = { workspace = true, default-features = true }
+aya = { workspace = true }
+aya-log = { workspace = true }
+env_logger = { workspace = true }
+libc = { workspace = true }
+log = { workspace = true }
+tokio = { workspace = true, features = [
+    "macros",
+    "rt",
+    "rt-multi-thread",
+    "net",
+    "signal",
+    "time",
+    "sync",
+    "fs",
+    "io-util",
+] }
+clap = { workspace = true, features = ["derive", "env"] }
+xxhash-rust = { version = "0.8.15", features = ["xxh3"] }
+serde = { workspace = true, features = ["derive"] }
+serde_yaml.workspace = true
+# Docker service discovery (talks to the local /var/run/docker.sock).
+bollard = "0.17"
+# Hot config reload via filesystem notifications (inotify on Linux).
+notify = "6.1"
+[build-dependencies]
+anyhow = { workspace = true }
+aya-build = { workspace = true }
+cargo_metadata = { workspace = true }
+# TODO(https://github.com/rust-lang/cargo/issues/12375): this should be an artifact dependency, but
+# it's not possible to tell cargo to use `-Z build-std` to build it. We cargo-in-cargo in the build
+# script to build this, but we want to teach cargo about the dependency so that cache invalidation
+# works properly.
+#
+# Note also that https://github.com/rust-lang/cargo/issues/10593 occurs when `target = ...` is added
+# to an artifact dependency; it seems possible to work around that by setting `resolver = "1"` in
+# Cargo.toml in the workspace root.
+#
+# Finally note that *any* usage of `artifact = ...` in *any* Cargo.toml in the workspace breaks
+# workflows with stable cargo; stable cargo outright refuses to load manifests that use unstable
+# features.
+l4-ebpf = { path = "../l4-ebpf" }
+
+[[bin]]
+name = "l4"
+path = "src/main.rs"

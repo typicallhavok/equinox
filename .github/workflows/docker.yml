@@ -1,0 +1,74 @@
+name: docker
+
+# Builds the ingress shield image and publishes it to:
+#   - GitHub Container Registry (ghcr.io) — zero setup, uses GITHUB_TOKEN.
+#   - Docker Hub (docker.io) — only if the DOCKERHUB_* secrets below are set.
+#
+# To enable Docker Hub, add two repo secrets (Settings > Secrets > Actions):
+#   DOCKERHUB_USERNAME  your Docker Hub username
+#   DOCKERHUB_TOKEN     a Docker Hub access token (Account Settings > Security)
+# The image then pushes to docker.io/<DOCKERHUB_USERNAME>/equinox.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Docker Hub is optional: skip the login + its image tags when no creds.
+      - name: Check Docker Hub credentials
+        id: dockerhub
+        run: |
+          if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Log in to Docker Hub
+        if: steps.dockerhub.outputs.enabled == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # GHCR always; Docker Hub added only when credentials are present.
+          images: |
+            ghcr.io/${{ github.repository }}
+            ${{ steps.dockerhub.outputs.enabled == 'true' && format('docker.io/{0}/equinox', secrets.DOCKERHUB_USERNAME) || '' }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

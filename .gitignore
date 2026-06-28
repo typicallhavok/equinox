@@ -1,0 +1,35 @@
+# ---- Rust / Cargo ----
+# Build artifacts (userspace + embedded eBPF objects all land here).
+/target/
+debug/
+**/*.rs.bk
+*.pdb
+
+# Cargo.lock IS committed: `l4` is a binary/application, so a locked,
+# reproducible dependency graph is what we want in CI and releases.
+# (Do not ignore Cargo.lock.)
+
+# ---- Local config / secrets ----
+# config.example.yaml and the compose default config.yaml are committed.
+# Ignore environment-specific copies so real IPs/hostnames never get pushed.
+config.local.yaml
+*.local.yaml
+.env
+.env.*
+
+# ---- Editor / IDE ----
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ---- OS cruft ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- cache ----
+.cargo
+
+test/

@@ -1,0 +1,80 @@
+# ====================================================================
+# equinox / l4 — eBPF ingress shield configuration
+# ====================================================================
+# Edits are hot-reloaded: the shield re-reads this file and rebuilds its
+# routing table into a standby buffer, then switches over atomically. The
+# XDP program is never detached, so traffic keeps flowing.
+
+gateway:
+  # Public-facing ports to intercept on the host. Everything else is passed
+  # straight through to the host stack (so SSH, etc. are never disrupted).
+  listen_ports:
+    - 80
+    - 443
+  # XDP attach mode: "auto" (try native, fall back to skb), "skb", "drv"/"native",
+  # or "hw". Native/driver mode is faster but needs NIC + driver support.
+  xdp_mode: "auto"
+
+discovery:
+  # "static" | "docker" | "dns"
+  strategy: "static"
+
+  # Re-run discovery this often to pick up scaled/crashed instances.
+  sync_interval_ms: 3000
+
+  # Drop validated packets to a listen port that have no backend, instead of
+  # passing them to the host stack. Defaults to false.
+  drop_unmatched: false
+
+  # ----- strategy: static -----------------------------------------------
+  # Backends already running on the same L2 segment. "ip" may include a port
+  # (ip:port) or you can set "port" explicitly; omit both to keep the original
+  # listen port. "mac" is optional — it is resolved from the host ARP table
+  # when omitted, but only after the kernel has seen traffic to that host.
+  static_routes:
+    - ip: "172.18.0.10"
+      port: 3000
+      mac: "02:42:ac:12:00:0a"
+    - ip: "172.18.0.11"
+      port: 3001
+      mac: "02:42:ac:12:00:0b"
+
+  # ----- strategy: docker -----------------------------------------------
+  # Discovers running containers via /var/run/docker.sock. Identify backends
+  # by the Docker network they're attached to and/or a compose service name.
+  # network: "equinox_backends"
+  # target_service_name: "backend"
+  # target_port: 80
+
+  # ----- strategy: dns --------------------------------------------------
+  # Resolves A records for the hostname; MAC comes from the host ARP table.
+  # target_service_name: "backend.internal"
+  # target_port: 443
+
+# ====================================================================
+# Abuse protection (per-source-IP). Enabled by default with abuse-level
+# limits. NOTE: if many clients share one IP (NAT/upstream proxy) you may
+# want to raise the limits or disable this.
+# ====================================================================
+protection:
+  enabled: true
+  rate_limit_per_sec: 5000   # valid requests/sec per source IP before blacklisting
+  malformed_limit: 20        # malformed packets per window per source IP
+  window_ms: 1000            # sliding window length
+  block_duration_secs: 300   # how long a tripped source stays blacklisted (5 min)
+
+# ====================================================================
+# Active backend health checking. A backend that fails a TCP connect is
+# evicted from the routing table until it recovers.
+# ====================================================================
+health_check:
+  enabled: true
+  timeout_ms: 500
+  # port: 8080   # override the probe port (defaults to the backend/listen port)
+
+# ====================================================================
+# Observability (opt-in). Set metrics_addr to expose Prometheus /metrics
+# and a /healthz readiness endpoint. Omit the whole block to keep it off.
+# ====================================================================
+# observability:
+#   metrics_addr: "0.0.0.0:9100"

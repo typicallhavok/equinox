@@ -1,0 +1,23 @@
+[package]
+name = "l4-ebpf"
+version = "0.1.0"
+edition.workspace = true
+
+# The eBPF object must be GPL-2.0: the Linux kernel only loads programs whose
+# license string is GPL-compatible when they use restricted helpers (e.g. the
+# ones behind aya-log). The userspace product (`l4`) remains Apache-2.0.
+license = "GPL-2.0"
+
+[dependencies]
+l4-common = { path = "../l4-common" }
+
+aya-ebpf = { workspace = true }
+aya-log-ebpf = { workspace = true }
+network-types = "0.1.0"
+
+[build-dependencies]
+which = { workspace = true }
+
+[[bin]]
+name = "l4"
+path = "src/main.rs"
