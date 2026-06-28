@@ -44,8 +44,11 @@ jobs:
       - name: Format check
         run: cargo fmt --all -- --check
 
+      # Exclude the eBPF crate: it only compiles for the `bpf` target (built by
+      # l4's build script), not the host triple `--workspace` would force here.
       - name: Clippy
-        run: cargo clippy --workspace -- -D warnings
+        run: cargo clippy --workspace --exclude l4-ebpf -- -D warnings
 
+      # This compiles the eBPF object for the BPF target via l4's build script.
       - name: Build (release)
         run: cargo build --release --package l4

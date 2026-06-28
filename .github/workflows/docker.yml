@@ -20,6 +20,13 @@ jobs:
     permissions:
       contents: read
       packages: write
+    # Secrets are read once here so they aren't referenced all over the file.
+    # (Editor "context access might be invalid" hints are just the linter not
+    # knowing whether the secret is set — they're harmless and disappear once
+    # the secrets exist.)
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -32,22 +39,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Docker Hub is optional: skip the login + its image tags when no creds.
-      - name: Check Docker Hub credentials
-        id: dockerhub
+      # GHCR image names must be lowercase; the owner/repo may not be.
+      - name: Compute image names
+        id: names
         run: |
-          if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          echo "ghcr=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
+            echo "dockerhub_enabled=true" >> "$GITHUB_OUTPUT"
+            echo "dockerhub=docker.io/${DOCKERHUB_USERNAME}/equinox" >> "$GITHUB_OUTPUT"
           else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "dockerhub_enabled=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Log in to Docker Hub
-        if: steps.dockerhub.outputs.enabled == 'true'
+        if: steps.names.outputs.dockerhub_enabled == 'true'
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
 
       - name: Image metadata
         id: meta
@@ -55,8 +64,8 @@ jobs:
         with:
           # GHCR always; Docker Hub added only when credentials are present.
           images: |
-            ghcr.io/${{ github.repository }}
-            ${{ steps.dockerhub.outputs.enabled == 'true' && format('docker.io/{0}/equinox', secrets.DOCKERHUB_USERNAME) || '' }}
+            ${{ steps.names.outputs.ghcr }}
+            ${{ steps.names.outputs.dockerhub_enabled == 'true' && steps.names.outputs.dockerhub || '' }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
