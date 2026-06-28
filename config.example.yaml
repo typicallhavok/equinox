@@ -1,7 +1,7 @@
 # ====================================================================
-# equinox / l4 — eBPF ingress shield configuration
+# equinox / l4 — eBPF L4 load balancer forwarding plane configuration
 # ====================================================================
-# Edits are hot-reloaded: the shield re-reads this file and rebuilds its
+# Edits are hot-reloaded: the forwarding plane re-reads this file and rebuilds its
 # routing table into a standby buffer, then switches over atomically. The
 # XDP program is never detached, so traffic keeps flowing.
 

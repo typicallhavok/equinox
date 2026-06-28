@@ -1,6 +1,6 @@
 name: docker
 
-# Builds the ingress shield image and publishes it to:
+# Builds the L4 load balancer forwarding plane image and publishes it to:
 #   - GitHub Container Registry (ghcr.io) — zero setup, uses GITHUB_TOKEN.
 #   - Docker Hub (docker.io) — only if the DOCKERHUB_* secrets below are set.
 #

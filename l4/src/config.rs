@@ -1,4 +1,4 @@
-//! Configuration parsing for the ingress shield.
+//! Configuration parsing for the L4 load balancer forwarding plane.
 //!
 //! The format mirrors a simple nginx-style proxy config: a `gateway` block of
 //! public ports to intercept and a `discovery` block describing where the
@@ -135,7 +135,7 @@ impl Config {
         Ok(config)
     }
 
-    /// Ports the shield should intercept, defaulting to HTTP/HTTPS.
+    /// Ports the forwarding plane should intercept, defaulting to HTTP/HTTPS.
     pub fn listen_ports(&self) -> Vec<u16> {
         match &self.gateway {
             Some(g) if !g.listen_ports.is_empty() => g.listen_ports.clone(),

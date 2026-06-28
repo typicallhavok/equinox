@@ -22,7 +22,7 @@ use tokio::{signal, sync::mpsc};
 
 #[derive(Debug, Parser)]
 struct Opt {
-    /// Network interface to attach the XDP shield to.
+    /// Network interface to attach the XDP forwarding plane to.
     /// Auto-detected from the default route when unset.
     #[clap(short, long, env = "IFACE")]
     iface: Option<String>,
@@ -62,7 +62,7 @@ fn attach_xdp(program: &mut Xdp, iface: &str, mode: &str) -> Result<()> {
     for (flags, name) in modes {
         match program.attach(iface, *flags) {
             Ok(_) => {
-                info!("XDP shield attached to {iface} in {name} mode");
+                info!("XDP forwarding plane attached to {iface} in {name} mode");
                 return Ok(());
             }
             Err(e) => {
@@ -128,8 +128,8 @@ async fn main() -> Result<()> {
     }
 
     if let Err(e) = reload(&opt.config, &mut dp, &metrics).await {
-        // Don't abort on a bad first load; keep the shield up and retry on the
-        // next reload trigger so we never take the data plane down.
+        // Don't abort on a bad first load; keep the forwarding plane up and retry
+        // on the next reload trigger so we never take the data plane down.
         error!("initial config load failed: {e:#}");
     }
 
@@ -143,7 +143,7 @@ async fn main() -> Result<()> {
     let mut ticker = tokio::time::interval(interval);
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-    info!("ingress shield up; hot reload active (poll every {interval:?})");
+    info!("L4 forwarding plane up; hot reload active (poll every {interval:?})");
 
     let shutdown = shutdown_signal();
     tokio::pin!(shutdown);

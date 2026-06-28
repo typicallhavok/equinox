@@ -56,7 +56,7 @@ pub const BUFFERS: u32 = 2;
 
 /// Buffer (`0` or `1`) the data plane currently reads.
 pub const CTRL_ACTIVE: u32 = 0;
-/// `1` = drop validated-but-unrouted packets to a shielded port (else pass).
+/// `1` = drop validated-but-unrouted packets to a load-balanced port (else pass).
 pub const CTRL_DROP_UNMATCHED: u32 = 1;
 /// Max valid requests per window per source IP. `0` disables rate limiting.
 pub const CTRL_RATE_MAX: u32 = 2;

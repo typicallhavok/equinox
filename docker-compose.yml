@@ -1,19 +1,20 @@
 # ====================================================================
-# equinox ingress shield — nginx-style quick setup
+# equinox L4 load balancer forwarding plane — nginx-style quick setup
 # ====================================================================
 #   docker compose up --build
 #
-# This brings up the XDP shield plus two nginx backends on a bridge with a
-# predictable name (equinox0) so the shield can attach to it.
+# This brings up the XDP forwarding plane plus two nginx backends on a bridge with a
+# predictable name (equinox0) so the forwarding plane can attach to it.
 #
 # L2 NOTE: XDP_TX rewrites the destination MAC and re-transmits the frame out
 # the SAME interface, so backends must be on the same L2 segment as the
-# interface the shield is attached to. That is why the shield attaches to the
-# bridge (equinox0) that the backends live on. To shield real external traffic,
-# attach to your host's uplink NIC instead and keep the backends on that L2.
+# interface the forwarding plane is attached to. That is why the forwarding plane
+# attaches to the bridge (equinox0) that the backends live on. To load-balance
+# real external traffic, attach to your host's uplink NIC instead and keep the
+# backends on that L2.
 
 services:
-  shield:
+  forwarding-plane:
     build:
       context: .
       dockerfile: Dockerfile
@@ -33,7 +34,7 @@ services:
       # Docker discovery talks to the daemon socket.
       - /var/run/docker.sock:/var/run/docker.sock:ro
       # Mount the current directory as the config dir. Edit ./config.yaml on the
-      # host and the shield reloads it live. If ./config.yaml doesn't exist yet,
+      # host and the forwarding plane reloads it live. If ./config.yaml doesn't exist yet,
       # the entrypoint seeds a default template into it on first run.
       - ./:/app
     depends_on:
@@ -52,7 +53,7 @@ services:
 
 networks:
   backends:
-    # Fixed docker network name so the shield config can reference it, and a
+    # Fixed docker network name so the forwarding plane config can reference it, and a
     # fixed bridge interface name so IFACE=equinox0 is stable.
     name: equinox_backends
     driver: bridge

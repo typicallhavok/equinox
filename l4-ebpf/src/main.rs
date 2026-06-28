@@ -47,7 +47,7 @@ static mut BACKEND_MAP: HashMap<u32, Node> = HashMap::with_max_entries(N * BUFFE
 #[map]
 static mut CTRL: Array<u32> = Array::with_max_entries(CTRL_LEN, 0);
 
-/// Set of destination ports that should be shielded/routed. Everything else is
+/// Set of destination ports that should be load-balanced/routed. Everything else is
 /// passed straight to the host stack so we never break unrelated traffic.
 #[map]
 static mut PORT_MAP: HashMap<u16, u8> = HashMap::with_max_entries(64, 0);
@@ -142,9 +142,9 @@ fn try_l4(ctx: XdpContext) -> Result<u32, u32> {
             _ => return Ok(xdp_action::XDP_PASS),
         };
 
-        // ---- ingress shield: only configured listen ports are inspected ----
+        // ---- forwarding plane: only configured listen ports are inspected ----
         if unsafe { PORT_MAP.get(&dest_port) }.is_none() {
-            // Not a shielded port: leave it entirely to the host stack so we never
+            // Not a load-balanced port: leave it entirely to the host stack so we never
             // disrupt SSH, the control plane, or any other local traffic.
             return Ok(xdp_action::XDP_PASS);
         }
@@ -160,7 +160,7 @@ fn try_l4(ctx: XdpContext) -> Result<u32, u32> {
             }
         }
 
-        // ---- validation (shielded ports only) ----
+        // ---- validation (load-balanced ports only) ----
         let is_malformed = if is_tcp {
             // Flags live in byte 13 of the TCP header.
             let flags_ptr: *const u8 =

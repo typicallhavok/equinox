@@ -4,7 +4,7 @@
 //! deployment runs with zero extra surface. When enabled it serves a tiny
 //! dependency-free HTTP endpoint:
 //!   - `GET /metrics`  Prometheus text exposition of data-plane counters.
-//!   - `GET /healthz`  200 when the shield has at least one healthy backend, else 503.
+//!   - `GET /healthz`  200 when the forwarding plane has at least one healthy backend, else 503.
 
 use std::sync::{
     Arc,

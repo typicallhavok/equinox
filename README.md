@@ -20,10 +20,10 @@ cargo run --release
 Cargo build scripts are used to automatically build the eBPF correctly and include it in the
 program.
 
-## Ingress shield
+## L4 load balancer forwarding plane
 
-`l4` is an XDP-based ingress shield: instead of a userspace load balancer, an eBPF program
-attached to the NIC validates and routes packets in-kernel. Traffic to the configured
+`l4` is an XDP-based L4 load balancer forwarding plane: instead of a userspace load balancer,
+an eBPF program attached to the NIC validates and routes packets in-kernel. Traffic to the configured
 `listen_ports` is checked, hashed with Maglev consistent hashing, and DNAT'd to a backend
 with `XDP_TX`. Everything else is passed straight to the host stack, so unrelated traffic
 (SSH, etc.) is never disrupted.
@@ -48,8 +48,8 @@ docker run --rm --network host --privileged \
 ```
 
 To use and live-edit your own config, mount the current directory as `/app`. On first run the
-shield **seeds a `config.yaml` template into it for you** if one isn't there yet; edit that
-file and it hot-reloads:
+forwarding plane **seeds a `config.yaml` template into it for you** if one isn't there yet; edit
+that file and it hot-reloads:
 
 ```shell
 docker run --rm --network host --privileged \
@@ -97,7 +97,7 @@ discovery:
   # target_port: 443
 ```
 
-**Validation.** On a shielded port, truncated packets and illegal TCP flag combinations
+**Validation.** On a load-balanced port, truncated packets and illegal TCP flag combinations
 (NULL, SYN+FIN, SYN+RST, FIN+RST, XMAS) are dropped. A valid packet with no backend is
 passed through unless `drop_unmatched: true`.
 
@@ -113,7 +113,7 @@ connect; only healthy ones enter the Maglev table, so a crashed backend is evict
 reload cycle and re-added automatically when it recovers. Configure under `health_check`.
 
 **Metrics & health (opt-in).** Off unless you set `observability.metrics_addr`. When set, the
-shield serves Prometheus counters at `GET /metrics` (routed / dropped-by-reason, backend
+forwarding plane serves Prometheus counters at `GET /metrics` (routed / dropped-by-reason, backend
 counts) and a readiness probe at `GET /healthz` (200 with ≥1 healthy backend, else 503). Zero
 setup required to run without it.
 
@@ -127,7 +127,7 @@ sudo RUST_LOG=info ./target/release/l4 --config config.yaml
 # --iface is auto-detected from the default route; override with --iface eth0
 ```
 
-Docker (nginx-style quick setup — shield + two nginx backends on a fixed bridge `equinox0`):
+Docker (nginx-style quick setup — forwarding plane + two nginx backends on a fixed bridge `equinox0`):
 
 ```shell
 docker compose up --build
@@ -140,8 +140,8 @@ with the `IFACE` and `CONFIG` environment variables.
 
 - **L2 reachability**: `XDP_TX` rewrites the destination MAC and re-transmits out the *same*
   interface, so backends must be on that interface's L2 segment. The compose attaches the
-  shield to the `equinox0` bridge the backends live on; to shield external traffic, attach to
-  your uplink NIC and keep backends on that L2.
+  forwarding plane to the `equinox0` bridge the backends live on; to load-balance external
+  traffic, attach to your uplink NIC and keep backends on that L2.
 - **Return path**: only the destination IP is rewritten (no SNAT), so backends reply with
   their own address. Backends need the VIP configured (DSR-style) for client connections to
   match.

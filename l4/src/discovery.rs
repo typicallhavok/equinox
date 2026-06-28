@@ -4,7 +4,7 @@
 //! an optional destination port (`None` keeps the original listen port), and the
 //! L2 MAC the data plane rewrites the Ethernet destination to. For XDP_TX to
 //! deliver the frame, backends must be reachable on the same L2 segment as the
-//! shield's interface.
+//! forwarding plane's interface.
 
 use std::{
     collections::HashMap,

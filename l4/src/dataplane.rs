@@ -97,7 +97,7 @@ impl DataPlane {
             .context("writing CTRL_DROP_UNMATCHED")
     }
 
-    /// Reconcile the shielded port set, adding/removing entries as needed.
+    /// Reconcile the load-balanced port set, adding/removing entries as needed.
     pub fn set_ports(&mut self, ports: &[u16]) -> Result<()> {
         for &p in ports {
             if !self.installed_ports.contains(&p) {
