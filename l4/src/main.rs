@@ -39,10 +39,10 @@ fn detect_default_iface() -> Result<String> {
     for line in route.lines().skip(1) {
         let mut cols = line.split_whitespace();
         // Columns: Iface Destination Gateway Flags ...
-        if let (Some(iface), Some(dest)) = (cols.next(), cols.next()) {
-            if dest == "00000000" {
-                return Ok(iface.to_string());
-            }
+        if let (Some(iface), Some(dest)) = (cols.next(), cols.next())
+            && dest == "00000000"
+        {
+            return Ok(iface.to_string());
         }
     }
     anyhow::bail!("no default route found; pass --iface or set IFACE")
